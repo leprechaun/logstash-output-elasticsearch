@@ -48,7 +48,15 @@ require 'logstash-output-elasticsearch_jars.rb'
 #
 # - 429, Too Many Requests (RFC6585)
 # - 503, The server is currently unable to handle the request due to a temporary overloading or maintenance of the server.
-# 
+#
+# *Possibly retryable errors*
+#
+# You may run into a situation where ES rejects an event because a property does not match the type
+# already defined in the mapping. By default, this error is NOT retryable, and will generate an error in
+# the log. However, you may prefer to send it to ES anyway by renaming the type. This *will* affect your analytics
+# if you depend on the _type field in any way. However, for some, it is preferably to have mislabelled events,
+# over not having them all together. see @rename_type_on_mismatch
+#
 # Here are the rules of what is retried when:
 #
 # - Block and retry all events in bulk response that experiences transient network exceptions until
@@ -326,6 +334,10 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
   # create a new document with this parameter as json string if document_id doesn't exists
   config :upsert, :validate => :string, :default => ""
 
+  # Allow logstash to mangle the _type/mapping if ever there is a clash between
+  # the mapping and the event that failed to be posted.
+  config :rename_type_on_mismatch, :validate => :boolean, :default => false
+
   public
   def register
     @submit_mutex = Mutex.new
@@ -361,7 +373,7 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
       client_settings["network.host"] = @bind_host if @bind_host
       client_settings["transport.tcp.port"] = @bind_port if @bind_port
       client_settings["client.transport.sniff"] = @sniffing
- 
+
       if @node_name
         client_settings["node.name"] = @node_name
       else
@@ -544,12 +556,16 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
       @submit_mutex.unlock
     end
     if bulk_response["errors"]
-      actions_with_responses = actions.zip(bulk_response['statuses'])
+      actions_with_responses = actions.zip(bulk_response['statuses'], bulk_response['error_messages'])
       actions_to_retry = []
-      actions_with_responses.each do |action, resp_code|
+      actions_with_responses.each do |action, resp_code, error_message|
         if RETRYABLE_CODES.include?(resp_code)
           @logger.warn "retrying failed action with response code: #{resp_code}"
           actions_to_retry << action
+        elsif @rename_type_on_mismatch and resp_code == 400 and mapping_mismatch? error_message
+          @logger.warn "retrying mapping mismatch: #{resp_code}"
+          action[2]["tags"] ||= []
+          actions_to_retry << rename_type(action)
         elsif not SUCCESS_CODES.include?(resp_code)
           @logger.warn "failed action with response of #{resp_code}, dropping action: #{action}"
         end
@@ -561,6 +577,15 @@ class LogStash::Outputs::ElasticSearch < LogStash::Outputs::Base
   # When there are exceptions raised upon submission, we raise an exception so that
   # Stud::Buffer will retry to flush
   public
+  def mapping_mismatch?(error_message)
+    error_message.include? "MapperParsingException"
+  end
+
+  def rename_type(action)
+    action[1][:_type]= action[1][:_type] + Time.now.to_i.to_s
+    action
+  end
+
   def flush(actions, teardown = false)
     begin
       submit(actions)

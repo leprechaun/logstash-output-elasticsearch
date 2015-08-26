@@ -94,7 +94,11 @@ module LogStash::Outputs::Elasticsearch
           # where each `item` is a hash of {OPTYPE => Hash[]}. calling first, will retrieve 
           # this hash as a single array with two elements, where the value is the second element (i.first[1])
           # then the status of that item is retrieved.
-          {"errors" => true, "statuses" => bulk_response["items"].map { |i| i.first[1]['status'] }}
+          {
+            "errors" => true,
+            "statuses" => bulk_response["items"].map { |i| i.first[1]['status'] },
+            "error_messages" => bulk_response["items"].map { |i| i.first[1]['error'] }
+          }
         else
           {"errors" => false}
         end
@@ -222,8 +226,11 @@ module LogStash::Outputs::Elasticsearch
       def self.normalize_bulk_response(bulk_response)
         # TODO(talevy): parse item response objects to retrieve correct 200 (OK) or 201(created) status codes
         if bulk_response.has_failures()
-          {"errors" => true,
-           "statuses" => bulk_response.map { |i| (i.is_failed && i.get_failure.get_status.get_status) || 200 }}
+          {
+            "errors" => true,
+            "statuses" => bulk_response.map { |i| (i.is_failed && i.get_failure.get_status.get_status) || 200 },
+            "error_messages" => bulk_response.map { |i| (i.is_failed && i.get_failure.getMessage) || 200 }
+          }
         else
           {"errors" => false}
         end

@@ -132,6 +132,33 @@ describe "outputs/elasticsearch" do
         expect(settings.build.getAsMap["client.transport.sniff"]).to eq("true")
       end
     end
+  end
+
+  context "allow_mapping_mangling" do
+    context 'elasticsearch borks on mapping mismatch' do
+      context 'logstash was configured to allow mapping mangling' do
+        subject do
+          require "logstash/outputs/elasticsearch"
+          settings = {
+            "host" => "node01",
+            "protocol" => "transport"
+          }
+          next LogStash::Outputs::ElasticSearch.new(settings)
+        end
+
+        it 'should identify mapping mismatch errors correctly' do
+          error_message = "MapperParsingException[failed to parse]...dsdfsf"
+          expect_any_instance_of(LogStash::Outputs::Elasticsearch::Protocols::TransportClient).to receive(:client).and_return(nil)
+          subject.register
+          client = subject.instance_eval("@current_client")
+        end
+
+        it 'should retry with a semi-randomized type when configured to do so' do
+          true
+        end
+      end
+    end
+  end
 
     context "sniffing => false" do
       subject do
@@ -154,4 +181,3 @@ describe "outputs/elasticsearch" do
       end
     end
   end
-end

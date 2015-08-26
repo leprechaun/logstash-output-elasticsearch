@@ -25,7 +25,7 @@ describe LogStash::Outputs::Elasticsearch::Protocols::NodeClient do
       bulk_item_response_delete = org.elasticsearch.action.bulk.BulkItemResponse.new(32, "delete", failure)
       bulk_response = org.elasticsearch.action.bulk.BulkResponse.new([bulk_item_response_index, bulk_item_response_update, bulk_item_response_delete], 0)
       actual = LogStash::Outputs::Elasticsearch::Protocols::NodeClient.normalize_bulk_response(bulk_response)
-      insist { actual } == {"errors" => true, "statuses" => [400, 400, 400]}
+      insist { actual } == {"errors" => true, "statuses" => [400, 400, 400], "error_messages" => ["error message", "error message", "error message"]}
     end
   end
 end
@@ -48,7 +48,7 @@ describe LogStash::Outputs::Elasticsearch::Protocols::HTTPClient do
                                              "_type"=>"logs", "_id"=>"AUxTQ_OI5Jrgi-hC6rQB", "status"=>400,
                                              "error"=>"MapperParsingException[failed to parse]..."}}]}
       actual = LogStash::Outputs::Elasticsearch::Protocols::HTTPClient.normalize_bulk_response(bulk_response)
-      insist { actual } == {"errors"=> true, "statuses"=> [400]}
+      insist { actual } == {"errors"=> true, "statuses"=> [400], "error_messages" => ["MapperParsingException[failed to parse]..."]}
     end
   end
 end
