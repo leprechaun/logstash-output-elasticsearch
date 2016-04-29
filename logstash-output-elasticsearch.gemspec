@@ -1,12 +1,12 @@
 Gem::Specification.new do |s|
 
-  s.name            = 'logstash-output-elasticsearch'
+  s.name            = 'logstash-output-elasticsearch-leprechaun-fork'
   s.version         = '1.0.8'
   s.licenses        = ['apache-2.0']
   s.summary         = "Logstash Output to Elasticsearch"
   s.description     = "Output events to elasticsearch"
-  s.authors         = ["Elastic"]
-  s.email           = 'info@elastic.co'
+  s.authors         = ["Elastic", "Laurence MacGuire"]
+  s.email           = 'leprechaun@gmail.com'
   s.homepage        = "http://logstash.net/"
   s.require_paths = ["lib"]
 
